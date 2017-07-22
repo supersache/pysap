@@ -40,7 +40,7 @@ build: off
 
 test_script:
   # Run tests
-  #- "%PYTHON%\\python.exe setup.py test"
+  - "%PYTHON%\\python.exe setup.py test"
   # Build the docs
   - "%PYTHON%\\python.exe setup.py doc"
 
