@@ -24,6 +24,7 @@ from threading import Thread
 from struct import pack, unpack
 from SocketServer import BaseRequestHandler, ThreadingTCPServer
 # External imports
+import scapy.arch
 from scapy.fields import StrField
 from scapy.packet import Packet, Raw
 # Custom imports

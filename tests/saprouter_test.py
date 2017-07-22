@@ -23,7 +23,7 @@ import unittest
 from struct import unpack
 from threading import Thread
 # External imports
-
+import scapy.arch
 # Custom imports
 from pysap.SAPNI import SAPNIServerHandler, SAPNIServerThreaded, SAPNI
 from pysap.SAPRouter import (SAPRouter, SAPRouterRouteHop, router_is_route,

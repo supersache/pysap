@@ -21,6 +21,7 @@
 import unittest
 from struct import pack
 # External imports
+import scapy.arch
 from scapy.fields import StrField
 from scapy.packet import Packet, Raw
 # Custom imports
