@@ -20,7 +20,7 @@
 # External imports
 from scapy.layers.inet import TCP
 from scapy.packet import Packet, bind_layers
-from scapy.fields import (ByteField, ConditionalField, StrFixedLenField, FlagsField,
+from scapy.fields import (ByteField, ConditionalField, StrFixedLenField, FlagsField,    
                           IPField, ShortField, IntField, StrField, PacketListField,
                           FieldLenField, PacketField, StrLenField, IntEnumField,
                           ByteEnumKeysField, ShortEnumKeysField, Field,
@@ -758,6 +758,25 @@ class SAPMSLogon(PacketNoPadded):
         ConditionalField(SignedIntField("end", -1), lambda pkt:pkt.address6_length > 0),
     ]
 
+class SAPMSLogonV2(PacketNoPadded):
+    """SAP Message Server Logon packet.
+
+    Packet containing logon data.
+    """
+    name = "SAP Message Server Logon"
+    fields_desc = [
+        ShortEnumKeysField("type", 0, ms_logon_type_values),
+        ShortField("port", 0),
+        IPField("address", "0.0.0.0"),
+        StrFixedLenField("watweissich", "\x00"*4, 4), # das fehlt im urspruenglichen Paket
+        FieldLenField("logonname_length", None, length_of="logonname", fmt="!H"),  # <= 80h bytes
+        StrLenField("logonname", "", length_from=lambda pkt:pkt.logonname_length),
+        FieldLenField("misc_length", None, length_of="misc", fmt="!H"),  # <= 100h bytes
+        StrLenField("misc", "", length_from=lambda pkt:pkt.misc_length),
+        FieldLenField("host_length", None, length_of="host", fmt="!H"),  # <= 100h bytes
+        StrLenField("host", "", length_from=lambda pkt:pkt.host_length), # hier stehen bei meinen Paketen nur 0en drin, hinten die IP
+    ]
+
 
 class SAPMSProperty(Packet):
     """SAP Message Server Property packet.
@@ -1005,6 +1024,11 @@ class SAPDPInfo3(Packet):
     and before the MS ADM payload. Kernel 749.
     """
     name = "SAP Dispatcher Info v3"
+
+    #def __init__(self, _pkt=b"", post_transform=None, _internal=0, _underlayer=None, **fields):
+    #    print (".")
+    #    super (SAPDPInfo3,self).__init__(_pkt, post_transform, _internal, _underlayer, **fields)
+
     fields_desc = [
         IntField("dp_padd1", 185),
 
@@ -1077,7 +1101,52 @@ class SAPDPInfo3(Packet):
         IntField("dp_padd31", 0x0),
 
         StrFixedLenField("dp_padd32", "\x00"*5, 5),
+
+        #ByteField("kaisbugfix", 0x0),
     ]
+
+class SAPMSKomisch(Packet):
+    """SAP Message Server packet
+
+    This packet is used for the strange MS_DP_ADM packets which don't have the
+    Dp Adm Layer.
+    """
+    name = "SAP Message Server2"
+    fields_desc = [
+        StrFixedLenField("eyecatcher", "**MESSAGE**\x00", 12),
+        ByteField("version", 0x04),
+        ByteEnumKeysField("errorno", 0x00, ms_errorno_values),
+        StrFixedLenField("toname", "-" + " " * 39, 40),
+        FlagsField("msgtype", 0, 8, ["DIA", "UPD", "ENQ", "BTC", "SPO", "UP2", "ATP", "ICM"]),
+        ByteField("reserved", 0x00),
+        ByteEnumKeysField("domain", 0x00, ms_domain_values),
+        ByteField("reserved", 0x00),
+        StrFixedLenField("key", "\x00" * 8, 8),
+        ByteEnumKeysField("flag", 0x01, ms_flag_values),
+        ByteEnumKeysField("iflag", 0x01, ms_iflag_values),
+        StrFixedLenField("fromname", "-" + " " * 39, 40),
+        ConditionalField(ShortField("diag_port", 3200), lambda pkt:pkt.iflag == 0x08 and pkt.flag == 0x02),  # for MS_REQUEST+MS_LOGIN_2 it's the diag port
+        ConditionalField(ShortField("padd", 0x0000), lambda pkt:pkt.iflag != 0x08 or pkt.flag != 0x02),
+
+        # OpCode fields
+        ConditionalField(ByteEnumKeysField("opcode", 0x01, ms_opcode_values), lambda pkt:pkt.iflag in [0x00, 0x01, 0x02, 0x07]),  # extending all those fields with MS_SEND_TYPE and MS_SEND_TYPE_ONCE packets
+        ConditionalField(ByteEnumKeysField("opcode_error", 0x00, ms_opcode_error_values), lambda pkt:pkt.iflag in [0x00, 0x01, 0x02, 0x7]),
+        ConditionalField(ByteField("opcode_version", 0x01), lambda pkt:pkt.iflag in [0x00, 0x01, 0x02, 0x07]),
+        ConditionalField(ByteField("opcode_charset", 0x03), lambda pkt:pkt.iflag in [0x00, 0x01, 0x02, 0x07]),
+        ConditionalField(StrField("opcode_value", ""), lambda pkt:pkt.iflag in [0x00, 0x01] and pkt.opcode not in [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x11, 0x1c, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2f, 0x43, 0x44, 0x45, 0x46, 0x47, 0x4a]),
+        ConditionalField(StrField("opcode_trailer", ""), lambda pkt:pkt.iflag in [0x00, 0x01] and pkt.opcode not in [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x11, 0x1c, 0x1e, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2f, 0x43, 0x44, 0x45, 0x46, 0x47, 0x4a]),
+
+        # Dispatcher info
+        ConditionalField(ByteField("dp_version", 0x0), lambda pkt:pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)),
+        ConditionalField(PacketLenField("dp_info1", SAPDPInfo1(), SAPDPInfo1, length_from=lambda x: 507), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0d), # 745 kernel
+
+        ConditionalField(PacketLenField("dp_info2", SAPDPInfo2(), SAPDPInfo2, length_from=lambda x: 203), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0b), # 720 kernel
+
+        #ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3, length_from=lambda x: 179), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel
+        ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3, length_from=lambda x: 180), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel    
+        StrFixedLenField("sap_codepage_field", "\x004\x001\x000\x003", 8),
+        StrFixedLenField ("komisches_zeugs", " "*578, 578)
+    ]        
 
 
 class SAPMS(Packet):
@@ -1116,7 +1185,8 @@ class SAPMS(Packet):
 
         ConditionalField(PacketLenField("dp_info2", SAPDPInfo2(), SAPDPInfo2, length_from=lambda x: 203), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0b), # 720 kernel
 
-        ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3, length_from=lambda x: 179), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel
+        #ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3, length_from=lambda x: 179), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel
+        ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3, length_from=lambda x: 180), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel
 
         # MS ADM layer
         ConditionalField(StrFixedLenField("adm_eyecatcher", "AD-EYECATCH\x00", 12), lambda pkt: pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0),
@@ -1176,7 +1246,7 @@ class SAPMS(Packet):
         ConditionalField(StrFixedLenField("file_padding", "\x00\x00", 2), lambda pkt:pkt.opcode == 0x1f),
 
         # Get/Set/Del Logon fields
-        ConditionalField(PacketField("logon", None, SAPMSLogon), lambda pkt:pkt.opcode in [0x2b, 0x2c, 0x2d]),
+        ConditionalField(PacketField("logon", None, SAPMSLogonV2), lambda pkt:pkt.opcode in [0x2b, 0x2c, 0x2d]),
 
         # Server Disconnect/Shutdown fields
         ConditionalField(PacketField("shutdown_client", None, SAPMSClient3), lambda pkt:pkt.opcode in [0x2e, 0x2f, 0x30, 0x4a]),
