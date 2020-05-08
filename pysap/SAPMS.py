@@ -1155,6 +1155,8 @@ class SAPMS(Packet):
     This packet is used for the Message Server protocol.
     """
     name = "SAP Message Server"
+
+
     fields_desc = [
         StrFixedLenField("eyecatcher", "**MESSAGE**\x00", 12),
         ByteField("version", 0x04),
@@ -1180,21 +1182,21 @@ class SAPMS(Packet):
         ConditionalField(StrField("opcode_trailer", ""), lambda pkt:pkt.iflag in [0x00, 0x01] and pkt.opcode not in [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x11, 0x1c, 0x1e, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2f, 0x43, 0x44, 0x45, 0x46, 0x47, 0x4a]),
 
         # Dispatcher info
-        ConditionalField(ByteField("dp_version", 0x0), lambda pkt:pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)),
-        ConditionalField(PacketLenField("dp_info1", SAPDPInfo1(), SAPDPInfo1, length_from=lambda x: 507), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0d), # 745 kernel
+        ConditionalField(ByteField("dp_version", 0x0), lambda pkt:pkt.opcode == 0x0 or pkt.opcode==0x02 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)),
+        ConditionalField(PacketLenField("dp_info1", SAPDPInfo1(), SAPDPInfo1, length_from=lambda x: 507), lambda pkt:(pkt.opcode == 0x0 or pkt.opcode==0x02 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0d), # 745 kernel
 
-        ConditionalField(PacketLenField("dp_info2", SAPDPInfo2(), SAPDPInfo2, length_from=lambda x: 203), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0b), # 720 kernel
+        ConditionalField(PacketLenField("dp_info2", SAPDPInfo2(), SAPDPInfo2, length_from=lambda x: 203), lambda pkt:(pkt.opcode == 0x0 or pkt.opcode==0x02 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0b), # 720 kernel
 
         #ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3, length_from=lambda x: 179), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel
-        ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3, length_from=lambda x: 180), lambda pkt:(pkt.opcode == 0x0 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel
+        ConditionalField(PacketLenField("dp_info3", SAPDPInfo3(), SAPDPInfo3,  length_from=lambda x: 180), lambda pkt:(pkt.opcode == 0x0 or pkt.opcode==0x02 or (pkt.opcode_version == 0x00 and pkt.opcode_charset == 0x00)) and pkt.dp_version == 0x0e), # 749 kernel
 
         # MS ADM layer
-        ConditionalField(StrFixedLenField("adm_eyecatcher", "AD-EYECATCH\x00", 12), lambda pkt: pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0),
-        ConditionalField(ByteField("adm_version", 0x01), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0),
-        ConditionalField(ByteEnumKeysField("adm_type", 0x01, ms_adm_type_values), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0),
-        ConditionalField(IntToStrField("adm_recsize", 104, 11), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0),
-        ConditionalField(IntToStrField("adm_recno", 1, 11), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0),
-        ConditionalField(PacketListField("adm_records", None, SAPMSAdmRecord), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0),
+        ConditionalField(StrFixedLenField("adm_eyecatcher", "AD-EYECATCH\x00", 12), lambda pkt: pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0 or pkt.opcode==0x02),
+        ConditionalField(ByteField("adm_version", 0x01), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0 or pkt.opcode==0x02),
+        ConditionalField(ByteEnumKeysField("adm_type", 0x01, ms_adm_type_values), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0 or pkt.opcode==0x02),
+        ConditionalField(IntToStrField("adm_recsize", 104, 11), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0 or pkt.opcode==0x02),
+        ConditionalField(IntToStrField("adm_recno", 1, 11), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0 or pkt.opcode==0x02),
+        ConditionalField(PacketListField("adm_records", None, SAPMSAdmRecord), lambda pkt:pkt.iflag in [0x00, 0x02, 0x05, 0x07] or pkt.opcode == 0x0 or pkt.opcode==0x02),
 
         # Server List fields
         ConditionalField(PacketListField("clients", None, SAPMSClient1), lambda pkt:pkt.opcode in [0x02, 0x03, 0x04, 0x05] and pkt.opcode_version == 0x01),
